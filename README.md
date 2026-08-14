@@ -1,107 +1,110 @@
 # Multi-Factor Stock Ranking & Long-Short Backtest
 
-A quantitative finance project that ranks US equities on four canonical factors — **Value**, **Momentum**, **Quality**, and **Low Volatility** — and backtests a dollar-neutral long-short portfolio.
+A quantitative equity strategy that ranks large-cap US stocks on four canonical factors — **value, momentum, quality, and low-volatility** — and backtests a monthly-rebalanced, dollar-neutral long-short portfolio built from those rankings.
 
-## Resume Bullet (copy-paste ready)
+## Overview
 
-> Built a multi-factor equity ranking model (value, momentum, quality, low-volatility) in Python, combining cross-sectional z-scores into an equal-weight composite; backtested a monthly rebalanced long-short portfolio (top/bottom quintile) on 80+ large-cap US stocks (2018–2024), reporting Sharpe ratio, max drawdown, information ratio, and factor IC analysis vs. SPY benchmark.
+- **Universe:** 120 large-cap US stocks with sufficient price history (S&P 500 subset)
+- **Period:** 2018–2024 (59 monthly rebalances)
+- **Strategy:** Long top 20% / short bottom 20% by composite factor score, equal-weighted, dollar-neutral
+- **Costs:** 10 bps transaction cost applied to turnover at each rebalance
 
-## What This Project Does
+## Results
 
-### 1. Factor Construction
+| Metric | Value |
+|---|---|
+| Total Return | 20.3% |
+| Annualized Return | 2.7% |
+| Annualized Volatility | 7.4% |
+| Sharpe Ratio | -0.14 |
+| Max Drawdown | -14.8% |
+| Beta vs SPY | -0.10 |
+| Alpha vs SPY | -0.3% |
+| Information Ratio | -0.53 |
 
-| Factor | Definition | Economic Intuition |
-|--------|-----------|-------------------|
-| **Value** | Earnings yield (1 / trailing P/E) | Cheap stocks tend to outperform over long horizons (Fama-French HML) |
-| **Momentum** | 12-1 month return (skip last month) | Winners keep winning; avoids short-term reversal (Jegadeesh & Titman, 1993) |
-| **Quality** | Average of ROE and profit margin | Profitable, efficient firms outperform (Novy-Marx, 2013) |
-| **Low Volatility** | Negative of 60-day annualized vol | Low-vol anomaly: safer stocks often beat on risk-adjusted basis |
+**Factor Information Coefficients** (correlation with next-month returns):
 
-Each factor is **winsorized** (1st/99th percentile) and **cross-sectionally z-scored** at every date, then combined into a composite score with equal 25% weights.
+| Factor | IC | % Positive Months |
+|---|---|---|
+| Value | +0.019 | 55% |
+| Momentum | +0.014 | 53% |
+| Quality | +0.009 | 55% |
+| Low Volatility | -0.009 | 49% |
 
-### 2. Portfolio Construction
+### Cumulative Returns vs. SPY
+![Equity Curve](results/equity_curve.png)
 
-- **Universe:** ~80 large-cap US equities (S&P 500 subset)
-- **Long leg:** Top 20% by composite score (equal-weight)
-- **Short leg:** Bottom 20% by composite score (equal-weight)
-- **Structure:** Dollar-neutral (50% gross long, 50% gross short)
-- **Rebalance:** Monthly
-- **Costs:** 10 bps per trade (one-way), applied on turnover
+The strategy is designed to be market-neutral (beta ≈ -0.10), so it does not track SPY's bull-market gains — that's expected, not a bug. Notably, the strategy held up far better than SPY during the March 2020 crash, which is the point of market neutrality: isolating stock-selection skill from market direction.
 
-### 3. Backtest Engine
+### Drawdown
+![Drawdown](results/drawdown.png)
 
-Event-driven simulation that:
-1. Ranks stocks at each rebalance date
-2. Constructs target weights
-3. Computes daily portfolio returns
-4. Tracks turnover, factor exposures, and rebalance logs
+Max drawdown of -14.8% occurred in 2021, with a slow multi-year recovery — a real weakness of this specific factor blend during that regime.
 
-### 4. Analytics
+### Factor Predictive Power
+![Factor IC](results/factor_ic.png)
 
-- Sharpe ratio, max drawdown, Calmar ratio, win rate
-- Information ratio and alpha/beta vs. SPY
-- Factor Information Coefficient (IC) — validates each factor's predictive power
-- Equity curve, drawdown chart, monthly returns heatmap, factor exposure over time
+Value was the strongest and most consistent signal across the backtest period. Low-volatility had a slightly negative IC, underperforming as a standalone signal in this sample.
 
-## Project Structure
+### Net Factor Exposure Over Time
+![Factor Exposure](results/factor_exposure.png)
 
-```
-finance project/
-├── main.py                 # Entry point — run the full pipeline
-├── config.yaml             # Universe, factor weights, backtest params
-├── requirements.txt        # Python dependencies
-├── src/
-│   ├── data_loader.py      # Download & cache prices + fundamentals (yfinance)
-│   ├── factors.py          # Compute & normalize all 4 factors
-│   portfolio.py            # Long-short selection & weight construction
-│   backtest.py             # Simulation engine
-│   analytics.py            # Performance metrics & IC analysis
-│   visualize.py            # Charts
-├── data/                   # Cached market data (auto-created)
-└── output/                 # Results: charts, CSVs (auto-created)
-```
+### Monthly Returns Heatmap
+![Monthly Returns](results/monthly_returns.png)
 
-## Quick Start
+November 2020 (-6.0%) was the worst single month, coinciding with the COVID vaccine announcement, which triggered a sharp value/momentum rotation that hurt many factor strategies industry-wide.
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## Methodology
 
-# Run full pipeline (downloads data, computes factors, backtests, generates charts)
-python main.py
-```
+**Factors** (equal-weighted composite, cross-sectionally z-scored each month, winsorized at 1st/99th percentile):
 
-Results appear in `output/`:
-- `equity_curve.png` — Strategy vs. SPY
-- `drawdown.png` — Underwater chart
-- `factor_exposure.png` — Net long-short exposure per factor
-- `monthly_returns.png` — Returns heatmap by year/month
-- `factor_ic.png` — Factor predictive power
-- `performance_summary.csv` — All metrics
-- `factor_ic.csv` — IC by factor
-- `rebalance_log.csv` — Portfolio changes each month
+| Factor | Definition | Rationale |
+|---|---|---|
+| Value | Trailing EPS ÷ price | Cheap stocks tend to outperform (Fama-French HML) |
+| Momentum | 12-month return, skipping most recent month | Winners tend to keep winning (Jegadeesh & Titman, 1993); skipping the last month avoids short-term reversal |
+| Quality | 60% ROE + profit margin, 40% price stability | Profitable, stable firms tend to outperform (Novy-Marx, 2013) |
+| Low Volatility | Negative 60-day annualized volatility | Low-vol anomaly: lower-risk stocks often have better risk-adjusted returns |
 
-## Methodology Notes (for interviews)
+**Portfolio construction:** Every month-end, all stocks are ranked by composite score. Long the top 20% (equal-weighted), short the bottom 20% (equal-weighted), sized for zero net market exposure.
 
-**Why z-scores?** Cross-sectional z-scoring makes factors comparable (P/E of 15 vs. momentum of 0.3 are on the same scale) and is standard in institutional factor models.
+**Backtest engine:** Event-driven daily simulation (not vectorized), with transaction costs applied on turnover at each rebalance.
 
-**Why 12-1 momentum?** Skipping the most recent month avoids the short-term reversal effect that contaminates raw 12-month returns.
+**Why a fundamental lag?** Free fundamental data from yfinance is a current snapshot, not point-in-time. A lag is applied to approximate the delay before quarterly reports are actually public, reducing look-ahead bias.
 
-**Why a 63-day fundamental lag?** Free fundamental data from yfinance is a current snapshot, not point-in-time. The lag approximates the delay before quarterly reports are publicly available, reducing look-ahead bias.
+**Why z-scores?** Cross-sectional z-scoring puts factors on the same scale (e.g., a P/E of 15 vs. a momentum of 0.3 aren't otherwise comparable) and is standard practice in institutional factor models.
 
-**Limitations to mention honestly:**
-- Survivorship bias (current S&P 500 constituents used throughout)
-- Fundamental data is not truly point-in-time (production systems use Compustat/FactSet)
-- No slippage model beyond flat transaction costs
-- Shorting assumes full borrow availability
+## Key Takeaways
+
+- The strategy achieved its core design goal — near-zero market beta — but produced a negative Sharpe ratio and alpha over this specific period, reflecting the well-documented difficulty of market-neutral strategies during a sustained bull market (2018–2024).
+- Value was the most reliable standalone factor; low-volatility detracted from performance in this sample.
+- Honest limitations: fundamentals used are not truly point-in-time (production systems use Compustat/FactSet), the universe is not survivorship-bias-free (current S&P 500 constituents used throughout), there's no slippage model beyond flat transaction costs, and shorting assumes full borrow availability.
 
 ## Tech Stack
 
-- **Python 3.10+**
-- **pandas / numpy** — vectorized factor computation
-- **yfinance** — market data
-- **matplotlib / seaborn** — visualization
-- **scipy** — statistical metrics
+- Python 3.10+
+- `pandas` / `numpy` — vectorized factor computation
+- `yfinance` — market data
+- `matplotlib` / `seaborn` — visualization
+- `scipy` — statistical metrics
+
+## Possible Extensions
+
+- Point-in-time fundamentals (e.g., via Compustat) to remove look-ahead bias
+- Survivorship-bias-free universe construction
+- Sector-neutral long-short construction
+- Dynamic/regime-aware factor weighting
+- Walk-forward optimization instead of a single static backtest window
+
+## Running It
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Outputs (charts + CSVs) are saved to `output/`.
 
 ## Customization
 
@@ -112,6 +115,20 @@ Edit `config.yaml` to change:
 - Long/short percentiles (`backtest.long_pct`, `short_pct`)
 - Transaction costs (`backtest.transaction_cost_bps`)
 
-## License
+## Project Structure
 
-MIT — free to use on your resume and in interviews.
+```
+finance project/
+├── main.py              # entry point
+├── config.yaml           # universe, weights, dates
+├── requirements.txt
+├── src/
+│   ├── data_loader.py    # price + fundamentals data
+│   ├── factors.py        # factor computation
+│   ├── portfolio.py      # long-short portfolio construction
+│   ├── backtest.py       # event-driven simulation
+│   ├── analytics.py      # performance metrics
+│   └── visualize.py      # charts
+├── data/                 # cached data (auto-created)
+└── output/                # backtest results (auto-created)
+```
